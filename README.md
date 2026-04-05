@@ -260,3 +260,57 @@ return classfileBuffer;
 #### Amélioration résultante
 
 La méthode `transform` passe de 30 lignes à 5 lignes. Si le comportement des transformers doit évoluer, la modification se fait à un seul endroit dans `applyTransformers` au lieu de 4.
+
+---
+
+### 6. [Moyenne] Réduction de la complexité de `EnhancerCommand.enhance`
+
+**Commit :** `0ff237bb` — `refactor: reduce cyclomatic complexity of EnhancerCommand.enhance by extracting sub-methods`
+
+#### Situation existante
+
+La méthode `enhance` de `EnhancerCommand` concentrait toute la logique d'instrumentation en un seul bloc de ~100 lignes, mêlant vérification du lock, validation du listener, gestion des erreurs, traitement du cas "aucune classe affectée" et construction de messages d'aide. Ce dernier bloc en particulier contenait plusieurs conditions imbriquées et une longue construction de chaîne :
+
+```java
+if (effect.cCnt() == 0 || effect.mCnt() == 0) {
+    if (!StringUtils.isEmpty(effect.getOverLimitMsg())) {
+        // cas 1 : over limit
+    }
+    if (this.lazy) {
+        // cas 2 : lazy mode
+    } else {
+        // cas 3 : message d'aide sur 15 lignes
+        String smCommand = ...
+        String optionsCommand = ...
+        // ...
+    }
+}
+```
+
+La complexité cyclomatique de `enhance` était d'environ **14**. Mais au-delà de ce chiffre, la **complexité cognitive** était particulièrement élevée : un développeur devait maintenir simultanément en tête le contexte du lock de session, l'état de l'effect, le mode lazy et la logique de messages — le tout imbriqué dans un seul bloc try/catch.
+
+#### Modification apportée
+
+Extraction de trois méthodes privées :
+
+- `isSkipJDKTrace(listener)` — détecte si le listener est en mode trace JDK à exclure
+- `handleNoClassAffected(process, effect)` — gère les trois cas possibles quand aucune classe n'est affectée, retourne `true` si la commande doit s'arrêter
+- `buildNoMatchMessage()` — construit le message d'aide listé, séparant la logique de présentation du flux de contrôle
+
+La méthode `enhance` se résume désormais à un enchaînement clair d'étapes :
+
+```java
+boolean skipJDKTrace = isSkipJDKTrace(listener);
+// ...
+if (effect.cCnt() == 0 || effect.mCnt() == 0) {
+    if (handleNoClassAffected(process, effect)) {
+        return;
+    }
+}
+```
+
+#### Amélioration résultante
+
+La complexité cyclomatique de `enhance` passe de **14 à 11** — une petite réduction.
+
+Le gain principal est sur la **complexité cognitive** : chaque méthode extraite a une responsabilité unique et un nom qui décrit son intention. Un développeur qui lit `enhance` n'a plus besoin de parser mentalement les 35 lignes du bloc "no class affected" pour comprendre ce qui se passe,le nom `handleNoClassAffected` suffisant. S'il veut comprendre le détail, il navigue vers la méthode concernée de façon isolée. La méthode `buildNoMatchMessage` va encore plus loin en séparant la construction du message de la logique de flux, rendant chacune des deux indépendamment lisible et modifiable.
