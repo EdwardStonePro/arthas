@@ -63,8 +63,8 @@ public class AdviceListenerManager {
                     for (Entry<ClassLoader, ClassLoaderAdviceListenerManager> entry : adviceListenerMap.entrySet()) {
                         ClassLoaderAdviceListenerManager adviceListenerManager = entry.getValue();
                         synchronized (adviceListenerManager) {
-                            for (Entry<String, List<AdviceListener>> eee : adviceListenerManager.map.entrySet()) {
-                                List<AdviceListener> listeners = eee.getValue();
+                            for (Entry<String, List<AdviceListener>> methodListenerEntry : adviceListenerManager.map.entrySet()) {
+                                List<AdviceListener> listeners = methodListenerEntry.getValue();
                                 List<AdviceListener> newResult = new ArrayList<AdviceListener>();
                                 for (AdviceListener listener : listeners) {
                                     if (listener instanceof ProcessAware) {
@@ -81,7 +81,7 @@ public class AdviceListenerManager {
                                 }
 
                                 if (newResult.size() != listeners.size()) {
-                                    adviceListenerManager.map.put(eee.getKey(), newResult);
+                                    adviceListenerManager.map.put(methodListenerEntry.getKey(), newResult);
                                 }
 
                             }
