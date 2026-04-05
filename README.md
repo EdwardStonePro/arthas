@@ -495,3 +495,87 @@ assertEquals(0, AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(Sp
 #### Amélioration résultante
 
 Les deux branches de `buildInterceptorProcessors` (tracing et non-tracing) et le garde-fou de `canLoadSpyAPI` sont désormais couverts par des tests isolés. Ces trois comportements étaient auparavant testés implicitement et partiellement. La couverture de `Enhancer` passe ainsi de 2 à 5 tests.
+
+---
+
+### 10. [Grande] Décomposition de la god class `Enhancer` — extraction de `ClassFilter` et `MethodInstrumentor`
+
+**Commits :**
+- `3aedf60b` — `refactor: extraire ClassFilter depuis Enhancer pour séparer le filtrage de l'instrumentation`
+- `f1ae1231` — `refactor: extraire MethodInstrumentor depuis Enhancer pour séparer l'instrumentation du bytecode de l'orchestration`
+
+#### Lien avec les modifications précédentes
+
+Cette modification s'inscrit dans la continuité directe de la modification 7 (réduction de la complexité cyclomatique de `Enhancer.transform`). En modification 7, cinq méthodes avaient été extraites de `transform` pour en réduire la complexité : `canLoadSpyAPI`, `isLazyClassMatch`, `buildInterceptorProcessors`, `buildGroupLocationFilter` et `processMethodNode`. Ces méthodes restaient cependant dans `Enhancer`, simplement comme méthodes privées d'une même classe.
+
+La modification 7 avait amélioré la lisibilité de `transform`. La modification 10 va plus loin en améliorant l'architecture : ces méthodes sont maintenant réparties entre des classes dont la responsabilité est clairement délimitée.
+
+#### Situation existante
+
+Avant ces extractions, `Enhancer` cumulait trois responsabilités distinctes :
+
+1. **Filtrage** — déterminer quelles classes sont éligibles à l'instrumentation (classloader, type de classe, pattern d'exclusion...)
+2. **Instrumentation du bytecode** — sélectionner les méthodes, construire la chaîne d'intercepteurs, injecter les points d'interception SpyAPI
+3. **Orchestration** — trouver les classes correspondantes dans la JVM, déclencher le retransform, gérer le cache
+
+Avec environ 550 lignes, `Enhancer` était la god class centrale du package `advisor`. Auparavant, toute modification à l'une des trois responsabilités ci-dessus nécessitait de naviguer dans l'ensemble du fichier.
+
+#### Modification apportée
+
+**Extraction de `ClassFilter`** (commit `3aedf60b`)
+
+La classe `ClassFilter` encapsule toute la logique de filtrage des classes :
+
+| Méthode | Rôle |
+|---|---|
+| `removeNonEligible(Set<Class<?>>)` | Supprime les classes non éligibles du set, retourne la liste des classes filtrées avec leurs raisons |
+| `isTargetClassLoader(ClassLoader)` | Vérifie que le classloader correspond au hash cible |
+| `isSelfClassLoader(ClassLoader)` | Détecte le classloader d'Arthas lui-même |
+| `isExcludedByName(String)` | Vérifie le pattern d'exclusion par nom de classe |
+
+Les méthodes privées `isSelf`, `isUnsafeClass`, `isUnsupportedClass`, `isExclude` sont internalisées dans `ClassFilter`. Dans `Enhancer`, l'appel devient :
+
+```java
+// Avant
+List<Pair<Class<?>, String>> filtedList = filter(matchingClasses);
+
+// Après
+List<Pair<Class<?>, String>> filtedList = classFilter.removeNonEligible(matchingClasses);
+```
+
+**Extraction de `MethodInstrumentor`** (commit `f1ae1231`)
+
+La classe `MethodInstrumentor` encapsule toute la logique d'instrumentation du bytecode des méthodes. Elle reçoit à la construction le contexte nécessaire (`isTracing`, `skipJDKTrace`, `listener`, `affect`, `methodNameMatcher`) et expose une unique méthode publique :
+
+```java
+public void instrumentMatchingMethods(ClassNode classNode, ClassLoader inClassLoader, String className)
+```
+
+En interne, elle met en place les étapes que la modification 7 avait déjà nommées : `buildInterceptorProcessors`, `findMatchingMethods` (anciennement la boucle de filtrage dans `transform`), `buildGroupLocationFilter`, et `processMethodNode` pour chaque méthode. La méthode `isIgnore` et `isAbstract` y sont également internalisées.
+
+Dans `Enhancer.transform`, le bloc de transformation passe de environ 25 lignes à une seule :
+
+```java
+// Avant (modification 7 : 5 appels de méthodes + boucles)
+final List<InterceptorProcessor> interceptorProcessors = buildInterceptorProcessors();
+List<MethodNode> matchedMethods = ...
+GroupLocationFilter groupLocationFilter = buildGroupLocationFilter();
+for (MethodNode methodNode : matchedMethods) {
+    processMethodNode(methodNode, classNode, interceptorProcessors, groupLocationFilter, inClassLoader, className);
+}
+
+// Après (modification 10 : délégation complète)
+methodInstrumentor.instrumentMatchingMethods(classNode, inClassLoader, className);
+```
+
+#### Amélioration résultante
+
+`Enhancer` passe d'environ 550 lignes à ~200 lignes. Sa responsabilité est désormais claire : orchestrer la découverte de classes et le retransform. Elle ne sait plus rien de la façon dont les classes sont filtrées (c'est `ClassFilter`) ni de la façon dont les méthodes sont instrumentées (c'est `MethodInstrumentor` qui fait ce travail).
+
+Le gain au niveau architectural est illustré par les imports supprimés d'`Enhancer` : 20 imports liés à ASM, ByteKit, et SpyInterceptors ont été retirés.
+
+| Classe | Responsabilité unique |
+|---|---|
+| `Enhancer` | Orchestration : recherche de classes, retransform, cache |
+| `ClassFilter` | Filtrage : éligibilité des classes à l'instrumentation |
+| `MethodInstrumentor` | Instrumentation : injection des points d'interception SpyAPI dans le bytecode |
