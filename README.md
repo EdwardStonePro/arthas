@@ -156,3 +156,41 @@ for (Entry<String, List<AdviceListener>> methodListenerEntry : adviceListenerMan
 ```
 
 Le code est désormais lisible sans avoir à inférer le rôle de la variable depuis son type.
+
+---
+
+### 4. [Petite] Suppression du code mort Groovy
+
+**Commit :** `2d428f85` — `chore: remove dead Groovy code dropped since Arthas 3.0`
+
+#### Situation existante
+
+Trois fichiers Java dans le package `core.command` n'étaient plus utilisés depuis 2016 :
+
+- `monitor200/GroovyScriptCommand.java` — commande Groovy abandonnée
+- `monitor200/GroovyAdviceListener.java` — listener associé, annoté `@Deprecated`
+- `ScriptSupportCommand.java` — interface de support script, référencée uniquement par les deux fichiers ci-dessus
+
+Le commentaire dans `GroovyScriptCommand` indique explicitement la raison de l'abandon :
+
+```java
+/**
+ * Groovy support has been completed dropped in Arthas 3.0 because of severer memory leak.
+ */
+```
+
+La seule référence restante dans le projet actif était dans `BuiltinCommandPack.java`, mais commentée :
+
+```java
+// commandClassList.add(GroovyScriptCommand.class);
+```
+
+Ces fichiers représentaient 290 lignes de code jamais exécutées, non maintenues et potentiellement trompeuses pour un nouveau contributeur qui pourrait croire la fonctionnalité Groovy encore disponible.
+
+#### Modification apportée
+
+Suppression des trois fichiers. Aucune référence active ne restait dans le reste du projet.
+
+#### Amélioration résultante
+
+La base de code est allégée de 290 lignes mortes. Un nouveau développeur ne risque plus de tomber sur ces classes et de tenter de les utiliser ou de les maintenir.
