@@ -205,10 +205,7 @@ public abstract class EnhancerCommand extends AnnotatedCommand {
                 process.end(-1, msg);
                 return;
             }
-            boolean skipJDKTrace = false;
-            if(listener instanceof AbstractTraceAdviceListener) {
-                skipJDKTrace = ((AbstractTraceAdviceListener) listener).getCommand().isSkipJDKTrace();
-            }
+            boolean skipJDKTrace = isSkipJDKTrace(listener);
 
             Enhancer enhancer = new Enhancer(listener, listener instanceof InvokeTraceable, skipJDKTrace,
                     getClassNameMatcher(), getClassNameExcludeMatcher(), getMethodNameMatcher(), this.lazy, this.hashCode);
@@ -224,37 +221,7 @@ public abstract class EnhancerCommand extends AnnotatedCommand {
             }
 
             if (effect.cCnt() == 0 || effect.mCnt() == 0) {
-                // no class effected
-                if (!StringUtils.isEmpty(effect.getOverLimitMsg())) {
-                    process.appendResult(EnhancerModelFactory.create(effect, false));
-                    process.end(-1);
-                    return;
-                }
-                
-                // 懒加载模式：即使没有匹配的类也不立即结束，等待类加载
-                if (this.lazy) {
-                    String lazyMsg = "Lazy mode is enabled, waiting for class to be loaded. Press Q or Ctrl+C to abort.\n"
-                            + "When the target class is loaded, it will be automatically enhanced.";
-                    process.write(lazyMsg + "\n");
-                } else {
-                    // might be method code too large
-                    process.appendResult(EnhancerModelFactory.create(effect, false, "No class or method is affected"));
-
-                    String smCommand = Ansi.ansi().fg(Ansi.Color.GREEN).a("sm CLASS_NAME METHOD_NAME").reset().toString();
-                    String optionsCommand = Ansi.ansi().fg(Ansi.Color.GREEN).a("options unsafe true").reset().toString();
-                    String javaPackage = Ansi.ansi().fg(Ansi.Color.GREEN).a("java.*").reset().toString();
-                    String resetCommand = Ansi.ansi().fg(Ansi.Color.GREEN).a("reset CLASS_NAME").reset().toString();
-                    String logStr = Ansi.ansi().fg(Ansi.Color.GREEN).a(LogUtil.loggingFile()).reset().toString();
-                    String issueStr = Ansi.ansi().fg(Ansi.Color.GREEN).a("https://github.com/alibaba/arthas/issues/47").reset().toString();
-                    String msg = "No class or method is affected, try:\n"
-                            + "1. Execute `" + smCommand + "` to make sure the method you are tracing actually exists (it might be in your parent class).\n"
-                            + "2. Execute `" + optionsCommand + "`, if you want to enhance the classes under the `" + javaPackage + "` package.\n"
-                            + "3. Execute `" + resetCommand + "` and try again, your method body might be too large.\n"
-                            + "4. Match the constructor, use `<init>`, for example: `watch demo.MathGame <init>`\n"
-                            + "5. Check arthas log: " + logStr + "\n"
-                            + "6. Visit " + issueStr + " for more details.\n"
-                            + "7. If the class is not loaded yet, try to use `--lazy` or `-L` option to enable lazy mode.";
-                    process.end(-1, msg);
+                if (handleNoClassAffected(process, effect)) {
                     return;
                 }
             }
@@ -283,6 +250,53 @@ public abstract class EnhancerCommand extends AnnotatedCommand {
                 process.session().unLock();
             }
         }
+    }
+
+    private boolean isSkipJDKTrace(AdviceListener listener) {
+        if (listener instanceof AbstractTraceAdviceListener) {
+            return ((AbstractTraceAdviceListener) listener).getCommand().isSkipJDKTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Handles the case where no class or method was affected by the enhancement.
+     * Returns true if the command should stop, false if it should continue (lazy mode).
+     */
+    private boolean handleNoClassAffected(CommandProcess process, EnhancerAffect effect) {
+        if (!StringUtils.isEmpty(effect.getOverLimitMsg())) {
+            process.appendResult(EnhancerModelFactory.create(effect, false));
+            process.end(-1);
+            return true;
+        }
+
+        if (this.lazy) {
+            String lazyMsg = "Lazy mode is enabled, waiting for class to be loaded. Press Q or Ctrl+C to abort.\n"
+                    + "When the target class is loaded, it will be automatically enhanced.";
+            process.write(lazyMsg + "\n");
+            return false;
+        }
+
+        process.appendResult(EnhancerModelFactory.create(effect, false, "No class or method is affected"));
+        process.end(-1, buildNoMatchMessage());
+        return true;
+    }
+
+    private String buildNoMatchMessage() {
+        String smCommand = Ansi.ansi().fg(Ansi.Color.GREEN).a("sm CLASS_NAME METHOD_NAME").reset().toString();
+        String optionsCommand = Ansi.ansi().fg(Ansi.Color.GREEN).a("options unsafe true").reset().toString();
+        String javaPackage = Ansi.ansi().fg(Ansi.Color.GREEN).a("java.*").reset().toString();
+        String resetCommand = Ansi.ansi().fg(Ansi.Color.GREEN).a("reset CLASS_NAME").reset().toString();
+        String logStr = Ansi.ansi().fg(Ansi.Color.GREEN).a(LogUtil.loggingFile()).reset().toString();
+        String issueStr = Ansi.ansi().fg(Ansi.Color.GREEN).a("https://github.com/alibaba/arthas/issues/47").reset().toString();
+        return "No class or method is affected, try:\n"
+                + "1. Execute `" + smCommand + "` to make sure the method you are tracing actually exists (it might be in your parent class).\n"
+                + "2. Execute `" + optionsCommand + "`, if you want to enhance the classes under the `" + javaPackage + "` package.\n"
+                + "3. Execute `" + resetCommand + "` and try again, your method body might be too large.\n"
+                + "4. Match the constructor, use `<init>`, for example: `watch demo.MathGame <init>`\n"
+                + "5. Check arthas log: " + logStr + "\n"
+                + "6. Visit " + issueStr + " for more details.\n"
+                + "7. If the class is not loaded yet, try to use `--lazy` or `-L` option to enable lazy mode.";
     }
 
     protected void completeArgument3(Completion completion) {
