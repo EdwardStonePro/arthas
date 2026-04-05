@@ -21,13 +21,21 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ResultConsumerImpl implements ResultConsumer {
     private static final Logger logger = LoggerFactory.getLogger(ResultConsumerImpl.class);
+
+    private static final long POLL_TIME_LIMIT_MS = 2 * 1000;
+    private static final long LOCK_TIMEOUT_MS = 500;
+    private static final long MAX_SENDING_DELAY_MS = 100;
+    private static final long POLL_INTERVAL_MS = 100;
+    private static final long FLUSH_ITEM_COUNT_THRESHOLD = 100;
+    private static final long HEALTH_CHECK_TIMEOUT_MS = 1000;
+
     private BlockingQueue<ResultModel> resultQueue;
     private volatile long lastAccessTime;
     private volatile boolean polling;
     private ReentrantLock lock = new ReentrantLock();
     private int resultBatchSizeLimit = 20;
     private int resultQueueSize = DistributorOptions.resultQueueSize;
-    private long pollTimeLimit = 2 * 1000;
+    private long pollTimeLimit = POLL_TIME_LIMIT_MS;
     private String consumerId;
     private boolean closed;
     private long sendingItemCount;
@@ -53,7 +61,7 @@ public class ResultConsumerImpl implements ResultConsumer {
         try {
             lastAccessTime = System.currentTimeMillis();
             long accessTime = lastAccessTime;
-            if (lock.tryLock(500, TimeUnit.MILLISECONDS)) {
+            if (lock.tryLock(LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                 polling = true;
                 sendingItemCount = 0;
                 long firstResultTime = 0;
@@ -65,9 +73,9 @@ public class ResultConsumerImpl implements ResultConsumer {
 
                 while (!closed
                         &&sendingResults.size() < resultBatchSizeLimit
-                        && sendingDelay < 100
+                        && sendingDelay < MAX_SENDING_DELAY_MS
                         && waitingTime < pollTimeLimit) {
-                    ResultModel aResult = resultQueue.poll(100, TimeUnit.MILLISECONDS);
+                    ResultModel aResult = resultQueue.poll(POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
                     if (aResult != null) {
                         sendingResults.add(aResult);
                         //是否为第一次获取到数据
@@ -115,7 +123,7 @@ public class ResultConsumerImpl implements ResultConsumer {
     private boolean shouldFlush(List<ResultModel> sendingResults, ResultModel last) {
         //TODO 引入一个估算模型，每个model自统计对象数量
         sendingItemCount += ResultConsumerHelper.getItemCount(last);
-        return sendingItemCount >= 100;
+        return sendingItemCount >= FLUSH_ITEM_COUNT_THRESHOLD;
     }
 
     @Override
@@ -123,7 +131,7 @@ public class ResultConsumerImpl implements ResultConsumer {
 
         return isPolling()
                 || resultQueue.size() < resultQueueSize
-                || System.currentTimeMillis() - lastAccessTime < 1000;
+                || System.currentTimeMillis() - lastAccessTime < HEALTH_CHECK_TIMEOUT_MS;
     }
 
     @Override
