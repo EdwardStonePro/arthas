@@ -22,6 +22,11 @@ import com.taobao.arthas.core.util.matcher.EqualsMatcher;
 import demo.MathGame;
 import net.bytebuddy.agent.ByteBuddyAgent;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /**
  * 
  * @author hengyunabc 2020-05-19
@@ -132,6 +137,89 @@ public class EnhancerTest {
         } finally {
             anotherClassLoader.close();
         }
+    }
+
+    @org.junit.jupiter.api.Test
+    public void transformReturnsNullWhenClassLoaderCannotLoadSpyAPI() throws Throwable {
+        Instrumentation instrumentation = ByteBuddyAgent.install();
+        TestHelper.appendSpyJar(instrumentation);
+        ArthasBootstrap.getInstance(instrumentation, "ip=127.0.0.1");
+
+        AdviceListener listener = Mockito.mock(AdviceListener.class);
+        EqualsMatcher<String> methodNameMatcher = new EqualsMatcher<String>("print");
+        EqualsMatcher<String> classNameMatcher = new EqualsMatcher<String>(MathGame.class.getName());
+
+        Enhancer enhancer = new Enhancer(listener, false, false, classNameMatcher, null, methodNameMatcher);
+
+        // Un classloader qui échoue à charger SpyAPI, simulant une isolation de classloader
+        ClassLoader spyAPIBlockingLoader = new ClassLoader(null) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (name.equals(SpyAPI.class.getName())) {
+                    throw new ClassNotFoundException(name);
+                }
+                return super.loadClass(name, resolve);
+            }
+        };
+
+        ClassNode classNode = AsmUtils.loadClass(MathGame.class);
+        byte[] classfileBuffer = AsmUtils.toBytes(classNode);
+
+        byte[] result = enhancer.transform(spyAPIBlockingLoader, MathGame.class.getName().replace('.', '/'),
+                MathGame.class, null, classfileBuffer);
+
+        assertNull(result);
+    }
+
+    @org.junit.jupiter.api.Test
+    public void transformWithTracingAddsAtBeforeInvokeInstructions() throws Throwable {
+        Instrumentation instrumentation = ByteBuddyAgent.install();
+        TestHelper.appendSpyJar(instrumentation);
+        ArthasBootstrap.getInstance(instrumentation, "ip=127.0.0.1");
+
+        AdviceListener listener = Mockito.mock(AdviceListener.class);
+        EqualsMatcher<String> methodNameMatcher = new EqualsMatcher<String>("print");
+        EqualsMatcher<String> classNameMatcher = new EqualsMatcher<String>(MathGame.class.getName());
+
+        // isTracing = true : les intercepteurs de trace (atBeforeInvoke) doivent être injectés
+        Enhancer enhancer = new Enhancer(listener, true, false, classNameMatcher, null, methodNameMatcher);
+
+        ClassNode classNode = AsmUtils.loadClass(MathGame.class);
+        byte[] classfileBuffer = AsmUtils.toBytes(classNode);
+
+        byte[] result = enhancer.transform(MathGame.class.getClassLoader(),
+                MathGame.class.getName().replace('.', '/'), MathGame.class, null, classfileBuffer);
+
+        assertNotNull(result);
+        ClassNode resultClassNode1 = AsmUtils.toClassNode(result);
+        MethodNode printMethod = AsmUtils.findMethods(resultClassNode1.methods, "print").get(0);
+        assertTrue(AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(SpyAPI.class), "atBeforeInvoke").size() > 0);
+    }
+
+    @org.junit.jupiter.api.Test
+    public void transformWithoutTracingHasNoAtBeforeInvokeInstructions() throws Throwable {
+        Instrumentation instrumentation = ByteBuddyAgent.install();
+        TestHelper.appendSpyJar(instrumentation);
+        ArthasBootstrap.getInstance(instrumentation, "ip=127.0.0.1");
+
+        AdviceListener listener = Mockito.mock(AdviceListener.class);
+        EqualsMatcher<String> methodNameMatcher = new EqualsMatcher<String>("print");
+        EqualsMatcher<String> classNameMatcher = new EqualsMatcher<String>(MathGame.class.getName());
+
+        // isTracing = false : seulement atEnter/atExit, pas d'atBeforeInvoke
+        Enhancer enhancer = new Enhancer(listener, false, false, classNameMatcher, null, methodNameMatcher);
+
+        ClassNode classNode = AsmUtils.loadClass(MathGame.class);
+        byte[] classfileBuffer = AsmUtils.toBytes(classNode);
+
+        byte[] result = enhancer.transform(MathGame.class.getClassLoader(),
+                MathGame.class.getName().replace('.', '/'), MathGame.class, null, classfileBuffer);
+
+        assertNotNull(result);
+        ClassNode resultClassNode2 = AsmUtils.toClassNode(result);
+        MethodNode printMethod = AsmUtils.findMethods(resultClassNode2.methods, "print").get(0);
+        assertTrue(AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(SpyAPI.class), "atEnter").size() > 0);
+        assertEquals(0, AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(SpyAPI.class), "atBeforeInvoke").size());
     }
 
 }
