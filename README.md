@@ -637,3 +637,51 @@ public void setConditionExpress(String conditionExpress) {
 310 lignes supprimées pour 110 ajoutées. Chaque commande ne contient plus que ce qui lui est propre. `MonitorCommand` passe de 155 lignes à 71, `StackCommand` de 120 lignes à 50.
 
 Le framework CLI middleware-cli lit les annotations en remontant la hiérarchie de classes, donc les paramètres définis dans `ClassPatternCommand` sont transparents pour les utilisateurs des commandes. Les exceptions (`required=false` dans Stack, index 3 dans Watch) sont gérées par des overrides ciblés qui rendent les différences explicites plutôt que cachées dans du code dupliqué.
+
+---
+
+### 12. [Grande] Suppression du package `env.convert` — consolidation dans `env`
+
+**Commit :** (à venir) — `refactor: supprimer le package env.convert, déplacer Converter/ConvertiblePair/ConfigurableConversionService dans env et consolider DefaultConversionService avec classes internes`
+
+#### Situation existante
+
+Le package `core.env.convert` contenait 9 fichiers dont la quasi-totalité n'était utilisée qu'à un seul endroit : `DefaultConversionService`. Parmi eux, plusieurs converters ne contenaient qu'une seule ligne de code (`StringToIntegerConverter`, `StringToLongConverter`, `ObjectToStringConverter`) et deux n'étaient même plus utilisés du tout (`ObjectToStringConverter`, qui n'était jamais enregistré dans `addDefaultConverter`).
+
+L'existence du sous-package créait une fragmentation artificielle : les interfaces `Converter`, `ConfigurableConversionService` et la classe `ConvertiblePair` vivaient dans `env.convert` alors qu'elles appartiennent logiquement à `env`, le package qu'elles servent directement.
+
+#### Modification apportée
+
+Le package `env.convert` est supprimé dans son intégralité. Ses éléments sont répartis comme suit :
+
+**Déplacés dans `env` :**
+- `Converter` — interface fonctionnelle, utilisée dans tout le package `env`
+- `ConvertiblePair` — classe utilitaire de clé, idem
+- `ConfigurableConversionService` — interface de configuration du service de conversion
+
+**Inlinés comme lambdas dans `DefaultConversionService.addDefaultConverter()`** (converters triviaux, une ligne chacun) :
+- `StringToIntegerConverter` → `(source, targetType) -> Integer.parseInt(source)`
+- `StringToLongConverter` → `(source, targetType) -> Long.parseLong(source)`
+- `StringToEnumConverter` → `(source, targetType) -> Enum.valueOf(targetType, source)`
+
+**Supprimé sans remplacement :**
+- `ObjectToStringConverter` — jamais enregistré dans `addDefaultConverter`, code mort
+
+**Convertis en classes internes privées de `DefaultConversionService`** (logique non triviale qui justifie une classe dédiée) :
+- `StringToBooleanConverter` — gère les valeurs `true/on/yes/1` et `false/off/no/0`
+- `StringToInetAddressConverter` — gère `UnknownHostException`
+- `StringToArrayConverter` — parsing CSV + récursion via `ConversionService`
+
+`DefaultConversionService` est lui-même déplacé dans `env`. Les deux seuls fichiers externes qui importaient depuis `env.convert` (`AbstractPropertyResolver` et `ConfigurablePropertyResolver`) ont leurs imports mis à jour.
+
+#### Discussion sur l'amélioration
+
+Cette modification est sans doute la plus discutable de celles présentées dans ce rapport.
+
+D'un côté, la suppression du sous-package élimine une fragmentation qui paraissait artificielle : 9 fichiers pour une logique concentrée en un seul point d'utilisation est difficile à justifier. Les converters triviaux (une ligne) en particulier n'avaient aucune raison d'exister comme classes séparées, Java 8 permet précisément d'exprimer ce type de logique en lambdas sans perte de lisibilité.
+
+De l'autre, un sous-package `convert` n'est pas en soi une mauvaise pratique. Quelqu'un qui découvre le code pourrait s'attendre à trouver les converters dans un sous-package dédié, et leur absence dans `env` pourrait surprendre. Le fait que `DefaultConversionService` grossisse avec trois classes internes peut aussi être vu comme une forme de god class naissante, ce qui va à l'encontre des principes que ce projet s'est fixés.
+
+Il est également possible que le sous-package `env.convert` ait été prévu pour accueillir de futurs converters — auquel cas le supprimer ferme cette porte sans nécessité.
+
+En définitive, nous défendons cette modification principalement sur la base de l'état actuel du code : un sous-package avec autant de classes triviales et de code mort n'apportait pas de valeur démontrable. Mais je reconnais que le gain est modeste, et qu'une personne différente aurait pu faire le choix inverse avec des arguments tout aussi valables.
