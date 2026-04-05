@@ -314,3 +314,42 @@ if (effect.cCnt() == 0 || effect.mCnt() == 0) {
 La complexité cyclomatique de `enhance` passe de **14 à 11** ce qui est une petite réduction.
 
 Le gain principal est sur la **complexité cognitive**. En effet, chaque méthode extraite a une responsabilité unique et un nom qui décrit son intention. Un développeur qui lit `enhance` n'a plus besoin de parser mentalement les 35 lignes du bloc "no class affected" pour comprendre ce qui se passe,le nom `handleNoClassAffected` suffisant. S'il veut comprendre le détail, il navigue vers la méthode concernée de façon isolée. La méthode `buildNoMatchMessage` va encore plus loin en séparant la construction du message de la logique de flux, rendant chacune des deux indépendamment lisible et modifiable.
+
+---
+
+### 7. [Moyenne] Réduction de la complexité de `Enhancer.transform`
+
+**Commit :** `2a3a2a23` — `refactor: extract canLoadSpyAPI, buildGroupLocationFilter, buildInterceptorProcessors, isLazyClassMatch and processMethodNode from Enhancer.transform to reduce its cyclomatic complexity`
+
+#### Situation existante
+
+La méthode `transform` de la classe `Enhancer` concentrait  environ 190 lignes de logique dans un seul bloc try/catch : vérification du classloader, filtrage en mode lazy, construction des intercepteurs, setup des filtres de localisation, et traitement de chaque méthode. Sa complexité cyclomatique était d'environ 30, ce qui en faisait l'une des méthodes les plus complexes du projet.
+
+#### Modification apportée
+
+Extraction de cinq méthodes privées, chacune avec une responsabilité unique :
+
+| Méthode extraite | Responsabilité |
+|---|---|
+| `canLoadSpyAPI(ClassLoader, String)` | Vérifie que le classloader peut charger `SpyAPI` |
+| `isLazyClassMatch(ClassLoader, String)` | Vérifie si une classe chargée en lazy mode doit être instrumentée |
+| `buildInterceptorProcessors()` | Construit la liste des intercepteurs selon le mode trace |
+| `buildGroupLocationFilter()` | Construit le filtre de localisation pour éviter la double instrumentation |
+| `processMethodNode(...)` | Traite une méthode individuelle (trace existante ou nouvelle instrumentation) |
+
+#### Amélioration résultante
+
+La méthode `transform` passe de environ 190 lignes à 55 lignes. Chaque étape est désormais nommée et lisible séquentiellement :
+
+```java
+if (!canLoadSpyAPI(inClassLoader, className))  return null;
+// ... filtre lazy ...
+final List<InterceptorProcessor> interceptorProcessors = buildInterceptorProcessors();
+// ... collecte des méthodes ...
+GroupLocationFilter groupLocationFilter = buildGroupLocationFilter();
+for (MethodNode methodNode : matchedMethods) {
+    processMethodNode(methodNode, classNode, interceptorProcessors, groupLocationFilter, inClassLoader, className);
+}
+```
+
+Comme pour `EnhancerCommand.enhance`, la réduction de complexité cyclomatique est notable (33 → 16 dans `transform`), mais le bénéfice principal reste la **complexité cognitive** : un développeur peut désormais comprendre le flux global de `transform` en quelques secondes, sans avoir à mémoriser des dizaines de lignes de détails imbriqués.
