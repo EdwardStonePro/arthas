@@ -15,7 +15,7 @@ Ce rapport présente les améliorations que j'ai effectuées sur le projet **Art
 
 ### 1. [Petite] Remplacement des nombres magiques dans `ResultConsumerImpl`
 
-**Commit :** `5cb3ea0c` — `refactor: replace magic numbers with named constants in ResultConsumerImpl`
+**Commit :** [`5cb3ea0c`](https://github.com/EdwardStonePro/arthas/commit/5cb3ea0c) — `refactor: replace magic numbers with named constants in ResultConsumerImpl`
 
 #### Situation existante
 
@@ -62,7 +62,7 @@ Le code est désormais auto-documenté et chaque constante porte un nom qui déc
 
 ### 2. [Petite] Renommage des intercepteurs dans `SpyInterceptors`
 
-**Commit :** `d68f53c3` — `refactor: rename SpyInterceptors inner classes with descriptive names`
+**Commit :** [`d68f53c3`](https://github.com/EdwardStonePro/arthas/commit/d68f53c3) — `refactor: rename SpyInterceptors inner classes with descriptive names`
 
 #### Situation existante
 
@@ -123,7 +123,7 @@ Le rôle de chaque intercepteur est désormais immédiatement compréhensible à
 
 ### 3. [Petite] Renommage de la variable `eee` dans `AdviceListenerManager`
 
-**Commit :** `9892bb9c` — `chore: rename variable eee to methodListenerEntry in AdviceListenerManager`
+**Commit :** [`9892bb9c`](https://github.com/EdwardStonePro/arthas/commit/9892bb9c) — `chore: rename variable eee to methodListenerEntry in AdviceListenerManager`
 
 #### Situation existante
 
@@ -161,7 +161,7 @@ Le code est désormais lisible sans avoir à inférer le rôle de la variable de
 
 ### 4. [Petite] Suppression du code mort Groovy
 
-**Commit :** `2d428f85` — `chore: remove dead Groovy code dropped since Arthas 3.0`
+**Commit :** [`2d428f85`](https://github.com/EdwardStonePro/arthas/commit/2d428f85) — `chore: remove dead Groovy code dropped since Arthas 3.0`
 
 #### Situation existante
 
@@ -199,7 +199,7 @@ La base de code est allégée de 290 lignes mortes. Un nouveau développeur ne r
 
 ### 5. [Moyenne] Suppression de la duplication dans `TransformerManager` par extraction de méthode
 
-**Commit :** `eafe290a` — `refactor: extract applyTransformers method to remove code duplication in TransformerManager`
+**Commit :** [`eafe290a`](https://github.com/EdwardStonePro/arthas/commit/eafe290a) — `refactor: extract applyTransformers method to remove code duplication in TransformerManager`
 
 #### Situation existante
 
@@ -265,7 +265,7 @@ La méthode `transform` passe de 30 lignes à 5 lignes. Si le comportement des t
 
 ### 6. [Moyenne] Réduction de la complexité de `EnhancerCommand.enhance`
 
-**Commit :** `0ff237bb` — `refactor: reduce cyclomatic complexity of EnhancerCommand.enhance by extracting sub-methods`
+**Commit :** [`0ff237bb`](https://github.com/EdwardStonePro/arthas/commit/0ff237bb) — `refactor: reduce cyclomatic complexity of EnhancerCommand.enhance by extracting sub-methods`
 
 #### Situation existante
 
@@ -319,7 +319,7 @@ Le gain principal est sur la **complexité cognitive**. En effet, chaque méthod
 
 ### 7. [Moyenne] Réduction de la complexité de `Enhancer.transform`
 
-**Commit :** `2a3a2a23` — `refactor: extract canLoadSpyAPI, buildGroupLocationFilter, buildInterceptorProcessors, isLazyClassMatch and processMethodNode from Enhancer.transform to reduce its cyclomatic complexity`
+**Commit :** [`2a3a2a23`](https://github.com/EdwardStonePro/arthas/commit/2a3a2a23) — `refactor: extract canLoadSpyAPI, buildGroupLocationFilter, buildInterceptorProcessors, isLazyClassMatch and processMethodNode from Enhancer.transform to reduce its cyclomatic complexity`
 
 #### Situation existante
 
@@ -358,7 +358,7 @@ Comme pour `EnhancerCommand.enhance`, la réduction de complexité cyclomatique 
 
 ### 8. [Moyenne] Suppression du `instanceof` dans `AdviceListenerManager` par ajout de `isActive()` dans l'interface
 
-**Commit :** `bc8bcf5b` — `refactor: add isActive() to AdviceListener to remove instanceof ProcessAware check in AdviceListenerManager`
+**Commit :** [`bc8bcf5b`](https://github.com/EdwardStonePro/arthas/commit/bc8bcf5b) — `refactor: add isActive() to AdviceListener to remove instanceof ProcessAware check in AdviceListenerManager`
 
 #### Situation existante
 
@@ -426,7 +426,7 @@ Le `AdviceListenerManager` ne connaît plus `ProcessAware` ni `ExecStatus`. La l
 
 ### 9. [Moyenne] Ajout de tests pour `Enhancer`
 
-**Commit :** `cc1e8f03` — `test: ajout de 3 tests JUnit 5 pour Enhancer couvrant canLoadSpyAPI et buildInterceptorProcessors`
+**Commit :** [`cc1e8f03`](https://github.com/EdwardStonePro/arthas/commit/cc1e8f03) — `test: ajout de 3 tests JUnit 5 pour Enhancer couvrant canLoadSpyAPI et buildInterceptorProcessors`
 
 #### Situation existante
 
@@ -501,8 +501,8 @@ Les deux branches de `buildInterceptorProcessors` (tracing et non-tracing) et le
 ### 10. [Grande] Décomposition de la god class `Enhancer` — extraction de `ClassFilter` et `MethodInstrumentor`
 
 **Commits :**
-- `3aedf60b` — `refactor: extraire ClassFilter depuis Enhancer pour séparer le filtrage de l'instrumentation`
-- `f1ae1231` — `refactor: extraire MethodInstrumentor depuis Enhancer pour séparer l'instrumentation du bytecode de l'orchestration`
+- [`3aedf60b`](https://github.com/EdwardStonePro/arthas/commit/3aedf60b) — `refactor: extraire ClassFilter depuis Enhancer pour séparer le filtrage de l'instrumentation`
+- [`f1ae1231`](https://github.com/EdwardStonePro/arthas/commit/f1ae1231) — `refactor: extraire MethodInstrumentor depuis Enhancer pour séparer l'instrumentation du bytecode de l'orchestration`
 
 #### Lien avec les modifications précédentes
 
@@ -584,7 +584,7 @@ Le gain au niveau architectural est illustré par les imports supprimés d'`Enha
 
 ### 11. [Grande] Création de `ClassPatternCommand`, super classe commune à `MonitorCommand`, `WatchCommand`, `TraceCommand` et `StackCommand`
 
-**Commit :** `6b0db6ad` — `refactor: extraire ClassPatternCommand comme super classe commune de MonitorCommand, WatchCommand, TraceCommand et StackCommand`
+**Commit :** [`6b0db6ad`](https://github.com/EdwardStonePro/arthas/commit/6b0db6ad) — `refactor: extraire ClassPatternCommand comme super classe commune de MonitorCommand, WatchCommand, TraceCommand et StackCommand`
 
 #### Situation existante
 
@@ -642,7 +642,7 @@ Le framework CLI middleware-cli lit les annotations en remontant la hiérarchie 
 
 ### 12. [Grande] Suppression du package `env.convert` — consolidation dans `env`
 
-**Commit :** (à venir) — `refactor: supprimer le package env.convert, déplacer Converter/ConvertiblePair/ConfigurableConversionService dans env et consolider DefaultConversionService avec classes internes`
+**Commit :** [`561fe2ce`](https://github.com/EdwardStonePro/arthas/commit/561fe2ce) — `refactor: remove env.convert package, move Converter/ConvertiblePair/ConfigurableConversionService to env and consolidate converters into DefaultConversionService`
 
 #### Situation existante
 
