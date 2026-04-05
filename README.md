@@ -118,3 +118,41 @@ interceptorProcessors.addAll(defaultInterceptorClassParser.parse(MethodEnterInte
 ```
 
 Le rôle de chaque intercepteur est désormais immédiatement compréhensible à la lecture du nom de la classe.
+
+---
+
+### 3. [Petite] Renommage de la variable `eee` dans `AdviceListenerManager`
+
+**Commit :** `9892bb9c` — `chore: rename variable eee to methodListenerEntry in AdviceListenerManager`
+
+#### Situation existante
+
+Dans la classe `AdviceListenerManager` du package `core.advisor`, une variable de boucle était nommée `eee`, sans aucune signification :
+
+```java
+for (Entry<String, List<AdviceListener>> eee : adviceListenerManager.map.entrySet()) {
+    List<AdviceListener> listeners = eee.getValue();
+    ...
+    adviceListenerManager.map.put(eee.getKey(), newResult);
+}
+```
+
+Ce nom ne donne aucune indication sur ce que représente cette entrée. Un développeur qui lit ce code doit déduire du type générique `Entry<String, List<AdviceListener>>` qu'il s'agit d'une association entre un nom de méthode et une liste d'écouteurs — information qui aurait dû être portée par le nom de la variable.
+
+#### Modification apportée
+
+Renommage de `eee` en `methodListenerEntry`, ce qui reflète exactement ce que contient cette entrée : l'association entre une signature de méthode (`String`) et ses `AdviceListener` associés.
+
+#### Amélioration résultante
+
+```java
+// Avant
+for (Entry<String, List<AdviceListener>> eee : adviceListenerManager.map.entrySet()) {
+    List<AdviceListener> listeners = eee.getValue();
+
+// Après
+for (Entry<String, List<AdviceListener>> methodListenerEntry : adviceListenerManager.map.entrySet()) {
+    List<AdviceListener> listeners = methodListenerEntry.getValue();
+```
+
+Le code est désormais lisible sans avoir à inférer le rôle de la variable depuis son type.
