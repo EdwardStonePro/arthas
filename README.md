@@ -194,3 +194,69 @@ Suppression des trois fichiers. Aucune référence active ne restait dans le res
 #### Amélioration résultante
 
 La base de code est allégée de 290 lignes mortes. Un nouveau développeur ne risque plus de tomber sur ces classes et de tenter de les utiliser ou de les maintenir.
+
+---
+
+### 5. [Moyenne] Suppression de la duplication dans `TransformerManager` par extraction de méthode
+
+**Commit :** `eafe290a` — `refactor: extract applyTransformers method to remove code duplication in TransformerManager`
+
+#### Situation existante
+
+Dans `TransformerManager`, la méthode `transform` de l'objet anonyme `classFileTransformer` répétait trois fois le même bloc de code, une fois pour chaque liste de transformers (`reTransformers`, `watchTransformers`, `traceTransformers`) :
+
+```java
+for (ClassFileTransformer classFileTransformer : reTransformers) {
+    byte[] transformResult = classFileTransformer.transform(loader, className, classBeingRedefined,
+            protectionDomain, classfileBuffer);
+    if (transformResult != null) {
+        classfileBuffer = transformResult;
+    }
+}
+
+for (ClassFileTransformer classFileTransformer : watchTransformers) {
+    byte[] transformResult = classFileTransformer.transform(loader, className, classBeingRedefined,
+            protectionDomain, classfileBuffer);
+    if (transformResult != null) {
+        classfileBuffer = transformResult;
+    }
+}
+
+for (ClassFileTransformer classFileTransformer : traceTransformers) {
+    // idem...
+}
+```
+
+La même logique était également présente dans `lazyClassFileTransformer` pour `lazyTransformers`. Au total, 4 boucles quasi-identiques dans la même classe.
+
+#### Modification apportée
+
+Extraction d'une méthode privée statique `applyTransformers` qui encapsule la logique commune :
+
+```java
+private static byte[] applyTransformers(List<ClassFileTransformer> transformers, ClassLoader loader,
+        String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+        byte[] classfileBuffer) throws IllegalClassFormatException {
+    for (ClassFileTransformer transformer : transformers) {
+        byte[] transformResult = transformer.transform(loader, className, classBeingRedefined,
+                protectionDomain, classfileBuffer);
+        if (transformResult != null) {
+            classfileBuffer = transformResult;
+        }
+    }
+    return classfileBuffer;
+}
+```
+
+La méthode `transform` devient alors :
+
+```java
+classfileBuffer = applyTransformers(reTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
+classfileBuffer = applyTransformers(watchTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
+classfileBuffer = applyTransformers(traceTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
+return classfileBuffer;
+```
+
+#### Amélioration résultante
+
+La méthode `transform` passe de 30 lignes à 5 lignes. Si le comportement des transformers doit évoluer, la modification se fait à un seul endroit dans `applyTransformers` au lieu de 4.
