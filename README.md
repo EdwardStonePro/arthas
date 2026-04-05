@@ -682,6 +682,22 @@ D'un côté, la suppression du sous-package élimine une fragmentation qui parai
 
 De l'autre, un sous-package `convert` n'est pas en soi une mauvaise pratique. Quelqu'un qui découvre le code pourrait s'attendre à trouver les converters dans un sous-package dédié, et leur absence dans `env` pourrait surprendre. Le fait que `DefaultConversionService` grossisse avec trois classes internes peut aussi être vu comme une forme de god class naissante, ce qui va à l'encontre des principes que ce projet s'est fixés.
 
-Il est également possible que le sous-package `env.convert` ait été prévu pour accueillir de futurs converters — auquel cas le supprimer ferme cette porte sans nécessité.
+Il est également possible que le sous-package `env.convert` ait été prévu pour accueillir de futurs converters auquel cas le supprimer ferme cette porte sans nécessité.
 
-En définitive, nous défendons cette modification principalement sur la base de l'état actuel du code : un sous-package avec autant de classes triviales et de code mort n'apportait pas de valeur démontrable. Mais je reconnais que le gain est modeste, et qu'une personne différente aurait pu faire le choix inverse avec des arguments tout aussi valables.
+Néanmoins, je défends cette modification principalement sur la base de l'état actuel du code : un sous-package avec autant de classes triviales et de code mort n'apportait pas de valeur démontrable. Mais je reconnais que le gain est modeste, et qu'une personne différente aurait pu faire le choix inverse avec des arguments tout aussi valables.
+
+## Conclusion sur l'UE GL:
+
+Si l'UE GL m'a appris une chose, c'est que je déteste devoir refactoriser des projets qui sont clairement remplis d'erreurs, de pratiques logicelles douteuses et qui ne comportent pas de patterns reconnaissables classiques qui pourraient clairement aider à réduire la complexité des projets en question.
+
+Ainsi, je suppose que GL encourage les élèves à vouloir utiliser de bonnes pratiques dans la conception et la maintenance architecturelle de logiciels. Utiliser des patterns, éventuellement proposer le TDD (test driven development) pourrait nous éviter de nombreux problèmes des semaines, mois voire années plus tard. 
+
+Par exemple, dans le projet Arthas, que je considère de relativement basse qualité dans l'ensemble, utiliser le TDD aurait forcé l'implémentation de tests qui manquent cruellement à ce projet. 
+
+Ce qui m'a le plus frappé au cours de ce travail, c'est à quel point les problèmes de qualité s'accumulent et se renforcent mutuellement. Une god class comme `Enhancer` n'est pas un accident isolé ; elle existe parce que personne n'a appliqué le principe de responsabilité unique dès le départ, et parce que l'absence de tests rendait toute modification risquée, ce qui encourageait à continuer d'accumuler du code dans la même classe plutôt que de la décomposer. La modification 10 (décomposition d'`Enhancer`) n'aurait pas été possible aussi sereinement si la modification 9 (ajout de tests) ne l'avait pas précédée. C'est un cercle vicieux que TDD peut aider à rompre dès le début.
+
+L'autre leçon que je retiens est que la qualité d'un code se mesure autant à sa lisibilité qu'à son fonctionnement. Arthas fonctionne très bien, il est utilisé en production par des milliers de développeurs. Mais comprendre ce qu'il fait nécessitait, avant ces modifications, de naviguer dans des classes de 500 lignes, des variables nommées `eee`, des nombres magiques sans contexte. Le code était correct, mais pas lisible. GL m'a appris que ces deux dimensions sont indépendantes, et que l'une peut masquer l'autre pendant longtemps avant que les coûts de maintenance ne deviennent visibles.
+
+Je nuancerais cependant la conclusion facile qui consiste à dire qu'il "suffit" d'appliquer les bons patterns. Plusieurs modifications de ce rapport l'illustrent : la suppression du package `env.convert` (section 12) est défendable, mais pas évidente. La création de `ClassPatternCommand` (section 11) simplifie quatre classes, mais introduit une hiérarchie d'héritage dont les cas particuliers (`WatchCommand`, `StackCommand`) nécessitent des overrides qui peuvent surprendre. Refactoriser ce n'est pas appliquer mécaniquement des recettes, c'est constamment arbitrer entre des compromis, ce qui demande du jugement ajouté à de l'expérience (expérience dont je ne dispose pas suffisamment).
+
+Cette UE m'a donné des outils concrets, un vocabulaire précis (SRP, Tell Don't Ask, complexité cyclomatique, code mort), et surtout une sensibilité que je n'avais pas auparavant qui est celle de regarder un projet existant et d'identifier immédiatement ce qui en rend la maintenance coûteuse. C'est peut-être la compétence la plus utile à long terme, parce que dans un contexte professionnel, on passe bien plus de temps à travailler sur du code existant qu'à créer des projets de zéro.
