@@ -579,3 +579,61 @@ Le gain au niveau architectural est illustré par les imports supprimés d'`Enha
 | `Enhancer` | Orchestration : recherche de classes, retransform, cache |
 | `ClassFilter` | Filtrage : éligibilité des classes à l'instrumentation |
 | `MethodInstrumentor` | Instrumentation : injection des points d'interception SpyAPI dans le bytecode |
+
+---
+
+### 11. [Grande] Création de `ClassPatternCommand`, super classe commune à `MonitorCommand`, `WatchCommand`, `TraceCommand` et `StackCommand`
+
+**Commit :** `6b0db6ad` — `refactor: extraire ClassPatternCommand comme super classe commune de MonitorCommand, WatchCommand, TraceCommand et StackCommand`
+
+#### Situation existante
+
+Les quatre commandes `monitor`, `watch`, `trace` et `stack` partagent toutes les mêmes cinq paramètres de base :
+
+| Paramètre | Type | Annotation CLI | Valeur par défaut |
+|---|---|---|---|
+| `classPattern` | `String` | `@Argument(index=0)` | — |
+| `methodPattern` | `String` | `@Argument(index=1)` | — |
+| `conditionExpress` | `String` | `@Argument(index=2, required=false)` | — |
+| `isRegEx` | `boolean` | `@Option(shortName="E")` | `false` |
+| `numberOfLimit` | `int` | `@Option(shortName="n")` | `100` |
+
+Ces cinq champs, leurs setters annotés, leurs getters, et les implémentations de `getClassNameMatcher()`, `getClassNameExcludeMatcher()`, `getMethodNameMatcher()` étaient copiés-collés dans chacune des quatre classes. Toute correction ou évolution de l'un de ces éléments nécessitait de modifier quatre fichiers à la fois.
+
+#### Modification apportée
+
+Création d'une classe abstraite `ClassPatternCommand extends EnhancerCommand` qui centralise : 
+- Les 5 champs communs
+- Les 5 setters avec leurs annotations `@Argument` / `@Option`
+- Les 5 getters
+- Les implémentations par défaut de `getClassNameMatcher()`, `getClassNameExcludeMatcher()`, `getMethodNameMatcher()`
+
+Les quatre commandes étendent désormais `ClassPatternCommand` au lieu d'`EnhancerCommand` directement.
+
+Deux particularités ont nécessité des overrides explicites :
+
+**`StackCommand`** — le `method-pattern` est optionnel (`required=false`), permettant de cibler toutes les méthodes d'une classe: 
+```java
+@Override
+@Argument(index = 1, argName = "method-pattern", required = false)
+public void setMethodPattern(String methodPattern) {
+    super.setMethodPattern(methodPattern);
+}
+```
+
+**`WatchCommand`** — insère un argument `express` à l'index 2, décalant `condition-express` à l'index 3. L'override reindexe l'argument :
+```java
+@Override
+@Argument(index = 3, argName = "condition-express", required = false)
+public void setConditionExpress(String conditionExpress) {
+    super.setConditionExpress(conditionExpress);
+}
+```
+
+**`TraceCommand`** — garde ses overrides de `getClassNameMatcher()` et `getMethodNameMatcher()` pour le mode path tracing (`-p`), qui nécessite une logique de matching composite.
+
+#### Amélioration résultante
+
+310 lignes supprimées pour 110 ajoutées. Chaque commande ne contient plus que ce qui lui est propre. `MonitorCommand` passe de 155 lignes à 71, `StackCommand` de 120 lignes à 50.
+
+Le framework CLI middleware-cli lit les annotations en remontant la hiérarchie de classes, donc les paramètres définis dans `ClassPatternCommand` sont transparents pour les utilisateurs des commandes. Les exceptions (`required=false` dans Stack, index 3 dans Watch) sont gérées par des overrides ciblés qui rendent les différences explicites plutôt que cachées dans du code dupliqué.
