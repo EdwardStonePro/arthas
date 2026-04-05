@@ -421,3 +421,77 @@ Les imports `ProcessAware`, `Process` et `ExecStatus` ont également été suppr
 #### Amélioration résultante
 
 Le `AdviceListenerManager` ne connaît plus `ProcessAware` ni `ExecStatus`. La logique de décision "ce listener est-il encore actif ?" appartient désormais à l'objet lui-même, à l'endroit où la réponse peut être fournie avec le plus de précision. Si un nouveau type de listener avec une autre condition d'activité est ajouté à l'avenir, il lui suffira d'overrider `isActive()` sans avoir à toucher à `AdviceListenerManager`.
+
+---
+
+### 9. [Moyenne] Ajout de tests pour `Enhancer`
+
+**Commit :** `cc1e8f03` — `test: ajout de 3 tests JUnit 5 pour Enhancer couvrant canLoadSpyAPI et buildInterceptorProcessors`
+
+#### Situation existante
+
+La classe `Enhancer` est la composante centrale du package `core.advisor` : elle orchestre l'instrumentation du bytecode de chaque méthode ciblée. Pourtant, seuls deux tests existaient, tous deux écrits en JUnit 4 :
+
+- `test()` — vérifie que transformer une classe deux fois de suite n'injecte pas deux fois les appels SpyAPI
+- `testEnhanceWithClassLoaderHash()` — vérifie que le filtrage par hash de classloader fonctionne
+
+Ces tests couvraient un seul scénario de bout en bout, sans isoler les comportements individuels des méthodes extraites lors de la modification 7.
+
+#### Difficulté de mise en place
+
+Tester `Enhancer` s'est avéré significativement plus complexe que prévu. La classe s'appuie sur des outils particuliers : ASM pour la représentation du bytecode, ByteKit (interne Alibaba) pour l'injection d'intercepteurs, et SpyAPI qui doit impérativement être accessible depuis le bootstrap classloader pour que la transformation puisse aboutir.
+
+La principale difficulté était de comprendre comment inspecter le bytecode produit après transformation. Il n'existe pas de documentation publique sur `AsmUtils` (la classe utilitaire de ByteKit), et les méthodes pertinentes, `loadClass`, `toBytes`, `toClassNode`, `findMethods`, `findMethodInsnNode` n'ont été découvertes qu'en lisant le test existant `test()` et en comprenant comment il décomposait le résultat de `transform()`.
+
+Les tests existants ont servi de point de départ indispensable : c'est en les étudiant ligne par ligne que j'ai compris le cycle complet c'est à dire charger le bytecode original avec `AsmUtils.loadClass`, le passer à `transform()`, récupérer le `ClassNode` résultant, puis interroger ses `MethodNode` pour vérifier la présence ou l'absence d'instructions spécifiques de `SpyAPI`.
+
+Par ailleurs, l'infrastructure de test (injection du jar spy dans le bootstrap classloader via `TestHelper.appendSpyJar`, initialisation d'`ArthasBootstrap`) était difficile à reproduire sans s'appuyer sur les patterns déjà en place.
+
+#### Tests ajoutés
+
+Trois nouveaux tests en JUnit 5 (`@org.junit.jupiter.api.Test`) ont été ajoutés, en utilisant les assertions natives JUnit 5 (`assertNull`, `assertNotNull`, `assertTrue`, `assertEquals`) :
+
+**`transformReturnsNullWhenClassLoaderCannotLoadSpyAPI`**
+
+Couvre la méthode extraite `canLoadSpyAPI`. Arthas injecte des appels à `SpyAPI` dans le bytecode, ce qui implique que le classloader de la classe cible doit pouvoir charger `SpyAPI`. Si ce n'est pas le cas, `transform()` doit abandonner et retourner `null`.
+
+Un classloader personnalisé est créé pour lever `ClassNotFoundException` dès qu'on lui demande de charger `SpyAPI`. `transform()` est appelé avec ce classloader et le résultat est vérifié nul.
+
+```java
+ClassLoader spyAPIBlockingLoader = new ClassLoader(null) {
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        if (name.equals(SpyAPI.class.getName())) {
+            throw new ClassNotFoundException(name);
+        }
+        return super.loadClass(name, resolve);
+    }
+};
+byte[] result = enhancer.transform(spyAPIBlockingLoader, ...);
+assertNull(result);
+```
+
+**`transformWithTracingAddsAtBeforeInvokeInstructions`**
+
+Couvre la branche `isTracing=true` de `buildInterceptorProcessors`. En mode `trace`, les intercepteurs de suivi d'appels doivent être injectés, ce qui se traduit par la présence d'instructions `atBeforeInvoke` dans le bytecode produit.
+
+```java
+Enhancer enhancer = new Enhancer(listener, true, false, classNameMatcher, null, methodNameMatcher);
+// ...
+assertTrue(AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(SpyAPI.class), "atBeforeInvoke").size() > 0);
+```
+
+**`transformWithoutTracingHasNoAtBeforeInvokeInstructions`**
+
+Couvre la branche `isTracing=false` de `buildInterceptorProcessors`. En mode `watch`, seuls `atEnter`/`atExit` sont injectés. Le test vérifie simultanément que `atEnter` est bien présent (la transformation a eu lieu) et qu'`atBeforeInvoke` est absent (les intercepteurs de trace n'ont pas été ajoutés).
+
+```java
+Enhancer enhancer = new Enhancer(listener, false, false, classNameMatcher, null, methodNameMatcher);
+// ...
+assertTrue(AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(SpyAPI.class), "atEnter").size() > 0);
+assertEquals(0, AsmUtils.findMethodInsnNode(printMethod, Type.getInternalName(SpyAPI.class), "atBeforeInvoke").size());
+```
+
+#### Amélioration résultante
+
+Les deux branches de `buildInterceptorProcessors` (tracing et non-tracing) et le garde-fou de `canLoadSpyAPI` sont désormais couverts par des tests isolés. Ces trois comportements étaient auparavant testés implicitement et partiellement. La couverture de `Enhancer` passe ainsi de 2 à 5 tests.
