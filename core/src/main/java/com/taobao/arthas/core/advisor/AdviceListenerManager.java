@@ -10,9 +10,6 @@ import com.alibaba.arthas.deps.org.slf4j.Logger;
 import com.alibaba.arthas.deps.org.slf4j.LoggerFactory;
 import com.taobao.arthas.common.concurrent.ConcurrentWeakKeyHashMap;
 import com.taobao.arthas.core.server.ArthasBootstrap;
-import com.taobao.arthas.core.shell.system.ExecStatus;
-import com.taobao.arthas.core.shell.system.Process;
-import com.taobao.arthas.core.shell.system.ProcessAware;
 
 /**
  * 
@@ -61,31 +58,7 @@ public class AdviceListenerManager {
             public void run() {
                 try {
                     for (Entry<ClassLoader, ClassLoaderAdviceListenerManager> entry : adviceListenerMap.entrySet()) {
-                        ClassLoaderAdviceListenerManager adviceListenerManager = entry.getValue();
-                        synchronized (adviceListenerManager) {
-                            for (Entry<String, List<AdviceListener>> methodListenerEntry : adviceListenerManager.map.entrySet()) {
-                                List<AdviceListener> listeners = methodListenerEntry.getValue();
-                                List<AdviceListener> newResult = new ArrayList<AdviceListener>();
-                                for (AdviceListener listener : listeners) {
-                                    if (listener instanceof ProcessAware) {
-                                        ProcessAware processAware = (ProcessAware) listener;
-                                        Process process = processAware.getProcess();
-                                        if (process == null) {
-                                            continue;
-                                        }
-                                        ExecStatus status = process.status();
-                                        if (!status.equals(ExecStatus.TERMINATED)) {
-                                            newResult.add(listener);
-                                        }
-                                    }
-                                }
-
-                                if (newResult.size() != listeners.size()) {
-                                    adviceListenerManager.map.put(methodListenerEntry.getKey(), newResult);
-                                }
-
-                            }
-                        }
+                        cleanStaleListeners(entry.getValue());
                     }
                 } catch (Throwable e) {
                     try {
@@ -96,6 +69,23 @@ public class AdviceListenerManager {
                 }
             }
         }, 3, 3, TimeUnit.SECONDS);
+    }
+
+    private static void cleanStaleListeners(ClassLoaderAdviceListenerManager adviceListenerManager) {
+        synchronized (adviceListenerManager) {
+            for (Entry<String, List<AdviceListener>> methodListenerEntry : adviceListenerManager.map.entrySet()) {
+                List<AdviceListener> listeners = methodListenerEntry.getValue();
+                List<AdviceListener> newResult = new ArrayList<AdviceListener>();
+                for (AdviceListener listener : listeners) {
+                    if (listener.isActive()) {
+                        newResult.add(listener);
+                    }
+                }
+                if (newResult.size() != listeners.size()) {
+                    adviceListenerManager.map.put(methodListenerEntry.getKey(), newResult);
+                }
+            }
+        }
     }
 
     private static final ConcurrentWeakKeyHashMap<ClassLoader, ClassLoaderAdviceListenerManager> adviceListenerMap = new ConcurrentWeakKeyHashMap<ClassLoader, ClassLoaderAdviceListenerManager>();

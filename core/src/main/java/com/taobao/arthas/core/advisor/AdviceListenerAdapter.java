@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.taobao.arthas.core.command.express.ExpressException;
 import com.taobao.arthas.core.command.express.ExpressFactory;
 import com.taobao.arthas.core.shell.command.CommandProcess;
+import com.taobao.arthas.core.shell.system.ExecStatus;
 import com.taobao.arthas.core.shell.system.Process;
 import com.taobao.arthas.core.shell.system.ProcessAware;
 import com.taobao.arthas.core.util.Constants;
@@ -144,6 +145,14 @@ public abstract class AdviceListenerAdapter implements AdviceListener, ProcessAw
         process.write("Command execution times exceed limit: " + limit
                 + ", so command will exit. You can set it with -n option.\n");
         process.end();
+    }
+
+    @Override
+    public boolean isActive() {
+        if (process == null) {
+            return false;
+        }
+        return !process.status().equals(ExecStatus.TERMINATED);
     }
 
     public boolean isVerbose() {

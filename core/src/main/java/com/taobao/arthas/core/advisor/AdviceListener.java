@@ -70,4 +70,12 @@ public interface AdviceListener {
             Object target, Object[] args,
             Throwable throwable) throws Throwable;
 
+    /**
+     * Returns whether this listener is still active and should continue receiving notifications.
+     * Listeners that are no longer active will be removed from the registry.
+     */
+    default boolean isActive() {
+        return true;
+    }
+
 }
