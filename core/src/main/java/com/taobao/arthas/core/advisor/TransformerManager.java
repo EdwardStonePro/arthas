@@ -51,30 +51,9 @@ public class TransformerManager {
             @Override
             public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
                     ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
-                for (ClassFileTransformer classFileTransformer : reTransformers) {
-                    byte[] transformResult = classFileTransformer.transform(loader, className, classBeingRedefined,
-                            protectionDomain, classfileBuffer);
-                    if (transformResult != null) {
-                        classfileBuffer = transformResult;
-                    }
-                }
-
-                for (ClassFileTransformer classFileTransformer : watchTransformers) {
-                    byte[] transformResult = classFileTransformer.transform(loader, className, classBeingRedefined,
-                            protectionDomain, classfileBuffer);
-                    if (transformResult != null) {
-                        classfileBuffer = transformResult;
-                    }
-                }
-
-                for (ClassFileTransformer classFileTransformer : traceTransformers) {
-                    byte[] transformResult = classFileTransformer.transform(loader, className, classBeingRedefined,
-                            protectionDomain, classfileBuffer);
-                    if (transformResult != null) {
-                        classfileBuffer = transformResult;
-                    }
-                }
-
+                classfileBuffer = applyTransformers(reTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
+                classfileBuffer = applyTransformers(watchTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
+                classfileBuffer = applyTransformers(traceTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
                 return classfileBuffer;
             }
 
@@ -92,16 +71,7 @@ public class TransformerManager {
                 if (classBeingRedefined != null) {
                     return null;
                 }
-                
-                for (ClassFileTransformer transformer : lazyTransformers) {
-                    byte[] transformResult = transformer.transform(loader, className, classBeingRedefined,
-                            protectionDomain, classfileBuffer);
-                    if (transformResult != null) {
-                        classfileBuffer = transformResult;
-                    }
-                }
-
-                return classfileBuffer;
+                return applyTransformers(lazyTransformers, loader, className, classBeingRedefined, protectionDomain, classfileBuffer);
             }
 
         };
@@ -142,6 +112,19 @@ public class TransformerManager {
         lazyTransformers.clear();
         instrumentation.removeTransformer(classFileTransformer);
         instrumentation.removeTransformer(lazyClassFileTransformer);
+    }
+
+    private static byte[] applyTransformers(List<ClassFileTransformer> transformers, ClassLoader loader,
+            String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+            byte[] classfileBuffer) throws IllegalClassFormatException {
+        for (ClassFileTransformer transformer : transformers) {
+            byte[] transformResult = transformer.transform(loader, className, classBeingRedefined,
+                    protectionDomain, classfileBuffer);
+            if (transformResult != null) {
+                classfileBuffer = transformResult;
+            }
+        }
+        return classfileBuffer;
     }
 
 }
