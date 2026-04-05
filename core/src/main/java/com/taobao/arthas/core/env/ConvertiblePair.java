@@ -1,4 +1,4 @@
-package com.taobao.arthas.core.env.convert;
+package com.taobao.arthas.core.env;
 
 /**
  * Holder for a source-to-target class pair.
@@ -6,15 +6,8 @@ package com.taobao.arthas.core.env.convert;
 public final class ConvertiblePair {
 
     private final Class<?> sourceType;
-
     private final Class<?> targetType;
 
-    /**
-     * Create a new source-to-target pair.
-     * 
-     * @param sourceType the source type
-     * @param targetType the target type
-     */
     public ConvertiblePair(Class<?> sourceType, Class<?> targetType) {
         this.sourceType = sourceType;
         this.targetType = targetType;

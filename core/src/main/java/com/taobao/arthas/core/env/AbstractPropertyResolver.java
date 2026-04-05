@@ -20,8 +20,8 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import com.taobao.arthas.core.env.convert.ConfigurableConversionService;
-import com.taobao.arthas.core.env.convert.DefaultConversionService;
+import com.taobao.arthas.core.env.ConfigurableConversionService;
+import com.taobao.arthas.core.env.DefaultConversionService;
 
 /**
  * Abstract base class for resolving properties against any underlying source.

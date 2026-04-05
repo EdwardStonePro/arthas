@@ -16,7 +16,7 @@
 
 package com.taobao.arthas.core.env;
 
-import com.taobao.arthas.core.env.convert.ConfigurableConversionService;
+import com.taobao.arthas.core.env.ConfigurableConversionService;
 
 /**
  * Configuration interface to be implemented by most if not all
