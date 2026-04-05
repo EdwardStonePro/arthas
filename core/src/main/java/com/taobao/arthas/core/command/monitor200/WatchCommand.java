@@ -8,9 +8,6 @@ import com.taobao.arthas.core.command.Constants;
 import com.taobao.arthas.core.shell.cli.Completion;
 import com.taobao.arthas.core.shell.cli.CompletionUtils;
 import com.taobao.arthas.core.shell.command.CommandProcess;
-import com.taobao.arthas.core.util.SearchUtils;
-import com.taobao.arthas.core.util.StringUtils;
-import com.taobao.arthas.core.util.matcher.Matcher;
 import com.taobao.arthas.core.view.ObjectView;
 import com.taobao.middleware.cli.annotations.Argument;
 import com.taobao.middleware.cli.annotations.DefaultValue;
@@ -32,33 +29,17 @@ import com.taobao.middleware.cli.annotations.Summary;
         "  watch javax.servlet.Filter * --exclude-class-pattern com.demo.TestFilter\n" +
         "  watch OuterClass$InnerClass\n" +
         Constants.WIKI + Constants.WIKI_HOME + "watch")
-public class WatchCommand extends EnhancerCommand {
+public class WatchCommand extends ClassPatternCommand {
 
-    private String classPattern;
-    private String methodPattern;
     private String express;
-    private String conditionExpress;
     private boolean isBefore = false;
     private boolean isFinish = false;
     private boolean isException = false;
     private boolean isSuccess = false;
     private Integer expand = 1;
     private Integer sizeLimit = 10 * 1024 * 1024;
-    private boolean isRegEx = false;
-    private int numberOfLimit = 100;
-    
-    @Argument(index = 0, argName = "class-pattern")
-    @Description("The full qualified class name you want to watch")
-    public void setClassPattern(String classPattern) {
-        this.classPattern = StringUtils.normalizeClassName(classPattern);
-    }
 
-    @Argument(index = 1, argName = "method-pattern")
-    @Description("The method name you want to watch")
-    public void setMethodPattern(String methodPattern) {
-        this.methodPattern = methodPattern;
-    }
-
+    // WatchCommand inserts 'express' at index 2, shifting condition-express to index 3
     @Argument(index = 2, argName = "express", required = false)
     @DefaultValue("{params, target, returnObj}")
     @Description("The content you want to watch, written by ognl. Default value is '{params, target, returnObj}'\n" + Constants.EXPRESS_EXAMPLES)
@@ -66,10 +47,11 @@ public class WatchCommand extends EnhancerCommand {
         this.express = express;
     }
 
+    @Override
     @Argument(index = 3, argName = "condition-express", required = false)
     @Description(Constants.CONDITION_EXPRESS)
     public void setConditionExpress(String conditionExpress) {
-        this.conditionExpress = conditionExpress;
+        super.setConditionExpress(conditionExpress);
     }
 
     @Option(shortName = "b", longName = "before", flag = true)
@@ -108,18 +90,6 @@ public class WatchCommand extends EnhancerCommand {
         this.expand = expand;
     }
 
-    @Option(shortName = "E", longName = "regex", flag = true)
-    @Description("Enable regular expression to match (wildcard matching by default)")
-    public void setRegEx(boolean regEx) {
-        isRegEx = regEx;
-    }
-
-    @Option(shortName = "n", longName = "limits")
-    @Description("Threshold of execution times")
-    public void setNumberOfLimit(int numberOfLimit) {
-        this.numberOfLimit = numberOfLimit;
-    }
-
     @Override
     @Option(shortName = "c", longName = "classloader")
     @Description("The hash code of the special class's classLoader")
@@ -127,20 +97,8 @@ public class WatchCommand extends EnhancerCommand {
         super.setHashCode(hashCode);
     }
 
-    public String getClassPattern() {
-        return classPattern;
-    }
-
-    public String getMethodPattern() {
-        return methodPattern;
-    }
-
     public String getExpress() {
         return express;
-    }
-
-    public String getConditionExpress() {
-        return conditionExpress;
     }
 
     public boolean isBefore() {
@@ -165,38 +123,6 @@ public class WatchCommand extends EnhancerCommand {
 
     public Integer getSizeLimit() {
         return sizeLimit;
-    }
-
-    public boolean isRegEx() {
-        return isRegEx;
-    }
-
-    public int getNumberOfLimit() {
-        return numberOfLimit;
-    }
-
-    @Override
-    protected Matcher getClassNameMatcher() {
-        if (classNameMatcher == null) {
-            classNameMatcher = SearchUtils.classNameMatcher(getClassPattern(), isRegEx());
-        }
-        return classNameMatcher;
-    }
-
-    @Override
-    protected Matcher getClassNameExcludeMatcher() {
-        if (classNameExcludeMatcher == null && getExcludeClassPattern() != null) {
-            classNameExcludeMatcher = SearchUtils.classNameMatcher(getExcludeClassPattern(), isRegEx());
-        }
-        return classNameExcludeMatcher;
-    }
-
-    @Override
-    protected Matcher getMethodNameMatcher() {
-        if (methodNameMatcher == null) {
-            methodNameMatcher = SearchUtils.classNameMatcher(getMethodPattern(), isRegEx());
-        }
-        return methodNameMatcher;
     }
 
     @Override

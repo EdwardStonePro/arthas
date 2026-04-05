@@ -5,13 +5,11 @@ import com.taobao.arthas.core.advisor.AdviceListener;
 import com.taobao.arthas.core.command.Constants;
 import com.taobao.arthas.core.shell.command.CommandProcess;
 import com.taobao.arthas.core.util.SearchUtils;
-import com.taobao.arthas.core.util.StringUtils;
 import com.taobao.arthas.core.util.matcher.GroupMatcher;
 import com.taobao.arthas.core.util.matcher.Matcher;
 import com.taobao.arthas.core.util.matcher.RegexMatcher;
 import com.taobao.arthas.core.util.matcher.TrueMatcher;
 import com.taobao.arthas.core.util.matcher.WildcardMatcher;
-import com.taobao.middleware.cli.annotations.Argument;
 import com.taobao.middleware.cli.annotations.DefaultValue;
 import com.taobao.middleware.cli.annotations.Description;
 import com.taobao.middleware.cli.annotations.Name;
@@ -43,45 +41,10 @@ import java.util.List;
         "  trace OuterClass$InnerClass *\n" +
         Constants.WIKI + Constants.WIKI_HOME + "trace")
 //@formatter:on
-public class TraceCommand extends EnhancerCommand {
+public class TraceCommand extends ClassPatternCommand {
 
-    private String classPattern;
-    private String methodPattern;
-    private String conditionExpress;
-    private boolean isRegEx = false;
-    private int numberOfLimit = 100;
     private List<String> pathPatterns;
     private boolean skipJDKTrace;
-
-    @Argument(argName = "class-pattern", index = 0)
-    @Description("Class name pattern, use either '.' or '/' as separator")
-    public void setClassPattern(String classPattern) {
-        this.classPattern = StringUtils.normalizeClassName(classPattern);
-    }
-
-    @Argument(argName = "method-pattern", index = 1)
-    @Description("Method name pattern")
-    public void setMethodPattern(String methodPattern) {
-        this.methodPattern = methodPattern;
-    }
-
-    @Argument(argName = "condition-express", index = 2, required = false)
-    @Description(Constants.CONDITION_EXPRESS)
-    public void setConditionExpress(String conditionExpress) {
-        this.conditionExpress = conditionExpress;
-    }
-
-    @Option(shortName = "E", longName = "regex", flag = true)
-    @Description("Enable regular expression to match (wildcard matching by default)")
-    public void setRegEx(boolean regEx) {
-        isRegEx = regEx;
-    }
-
-    @Option(shortName = "n", longName = "limits")
-    @Description("Threshold of execution times")
-    public void setNumberOfLimit(int numberOfLimit) {
-        this.numberOfLimit = numberOfLimit;
-    }
 
     @Option(shortName = "p", longName = "path", acceptMultipleValues = true)
     @Description("path tracing pattern")
@@ -103,28 +66,8 @@ public class TraceCommand extends EnhancerCommand {
         super.setHashCode(hashCode);
     }
 
-    public String getClassPattern() {
-        return classPattern;
-    }
-
-    public String getMethodPattern() {
-        return methodPattern;
-    }
-
-    public String getConditionExpress() {
-        return conditionExpress;
-    }
-
     public boolean isSkipJDKTrace() {
         return skipJDKTrace;
-    }
-
-    public boolean isRegEx() {
-        return isRegEx;
-    }
-
-    public int getNumberOfLimit() {
-        return numberOfLimit;
     }
 
     public List<String> getPathPatterns() {
@@ -141,14 +84,6 @@ public class TraceCommand extends EnhancerCommand {
             }
         }
         return classNameMatcher;
-    }
-
-    @Override
-    protected Matcher getClassNameExcludeMatcher() {
-        if (classNameExcludeMatcher == null && getExcludeClassPattern() != null) {
-            classNameExcludeMatcher = SearchUtils.classNameMatcher(getExcludeClassPattern(), isRegEx());
-        }
-        return classNameExcludeMatcher;
     }
 
     @Override
@@ -176,7 +111,6 @@ public class TraceCommand extends EnhancerCommand {
      * 构造追踪路径匹配
      */
     private Matcher<String> getPathTracingClassMatcher() {
-
         List<Matcher<String>> matcherList = new ArrayList<Matcher<String>>();
         matcherList.add(SearchUtils.classNameMatcher(getClassPattern(), isRegEx()));
 
