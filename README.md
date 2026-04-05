@@ -353,3 +353,71 @@ for (MethodNode methodNode : matchedMethods) {
 ```
 
 Comme pour `EnhancerCommand.enhance`, la réduction de complexité cyclomatique est notable (33 → 16 dans `transform`), mais le bénéfice principal reste la **complexité cognitive** : un développeur peut désormais comprendre le flux global de `transform` en quelques secondes, sans avoir à mémoriser des dizaines de lignes de détails imbriqués.
+
+---
+
+### 8. [Moyenne] Suppression du `instanceof` dans `AdviceListenerManager` par ajout de `isActive()` dans l'interface
+
+**Commit :** `bc8bcf5b` — `refactor: add isActive() to AdviceListener to remove instanceof ProcessAware check in AdviceListenerManager`
+
+#### Situation existante
+
+Le bloc statique de `AdviceListenerManager` planifiait un nettoyage périodique des listeners expirés. La boucle interne contenait un enchaînement de vérifications extern à l'objet : un `instanceof`, un cast, un accès au process, un test de nullité, puis un test de statut :
+
+```java
+for (AdviceListener listener : listeners) {
+    if (listener instanceof ProcessAware) {
+        ProcessAware processAware = (ProcessAware) listener;
+        Process process = processAware.getProcess();
+        if (process == null) {
+            continue;
+        }
+        ExecStatus status = process.status();
+        if (!status.equals(ExecStatus.TERMINATED)) {
+            newResult.add(listener);
+        }
+    }
+}
+```
+
+Ce code viole le principe "Tell Don't Ask". Au lieu de demander à l'objet s'il est actif, il interroge son type, puis son état interne, depuis l'extérieur. De plus, la présence de `instanceof ProcessAware` crée un couplage fort entre `AdviceListenerManager` et l'interface `ProcessAware`, alors que ce gestionnaire n'a pas à connaître les détails d'implémentation de ses listeners.
+
+#### Modification apportée
+
+Ajout d'une méthode `isActive()` dans l'interface `AdviceListener` avec une implémentation par défaut qui retourne `true` :
+
+```java
+// AdviceListener.java
+default boolean isActive() {
+    return true;
+}
+```
+
+Override dans `AdviceListenerAdapter` (la classe abstraite qui implémente déjà `ProcessAware`) pour y encapsuler la vraie logique :
+
+```java
+// AdviceListenerAdapter.java
+@Override
+public boolean isActive() {
+    if (process == null) {
+        return false;
+    }
+    return !process.status().equals(ExecStatus.TERMINATED);
+}
+```
+
+La boucle dans `AdviceListenerManager` se réduit à une ligne :
+
+```java
+for (AdviceListener listener : listeners) {
+    if (listener.isActive()) {
+        newResult.add(listener);
+    }
+}
+```
+
+Les imports `ProcessAware`, `Process` et `ExecStatus` ont également été supprimés de `AdviceListenerManager`, qui n'a plus besoin de connaître ces types.
+
+#### Amélioration résultante
+
+Le `AdviceListenerManager` ne connaît plus `ProcessAware` ni `ExecStatus`. La logique de décision "ce listener est-il encore actif ?" appartient désormais à l'objet lui-même, à l'endroit où la réponse peut être fournie avec le plus de précision. Si un nouveau type de listener avec une autre condition d'activité est ajouté à l'avenir, il lui suffira d'overrider `isActive()` sans avoir à toucher à `AdviceListenerManager`.
