@@ -137,7 +137,7 @@ for (Entry<String, List<AdviceListener>> eee : adviceListenerManager.map.entrySe
 }
 ```
 
-Ce nom ne donne aucune indication sur ce que représente cette entrée. Un développeur qui lit ce code doit déduire du type générique `Entry<String, List<AdviceListener>>` qu'il s'agit d'une association entre un nom de méthode et une liste d'écouteurs — information qui aurait dû être portée par le nom de la variable.
+Ce nom ne donne aucune indication sur ce que représente cette entrée. Un développeur qui lit ce code doit déduire du type générique `Entry<String, List<AdviceListener>>` qu'il s'agit d'une association entre un nom de méthode et une liste d'écouteurs alors que c'est une information qui aurait dû être portée par le nom de la variable.
 
 #### Modification apportée
 
@@ -287,7 +287,7 @@ if (effect.cCnt() == 0 || effect.mCnt() == 0) {
 }
 ```
 
-La complexité cyclomatique de `enhance` était d'environ **14**. Mais au-delà de ce chiffre, la **complexité cognitive** était particulièrement élevée : un développeur devait maintenir simultanément en tête le contexte du lock de session, l'état de l'effect, le mode lazy et la logique de messages — le tout imbriqué dans un seul bloc try/catch.
+La complexité cyclomatique de `enhance` était d'environ **14**. Mais au-delà de ce chiffre, la **complexité cognitive** était particulièrement élevée : un développeur devait maintenir simultanément en tête le contexte du lock de session, l'état de l'effect, le mode lazy et la logique de messages, le tout imbriqué dans un seul bloc try/catch.
 
 #### Modification apportée
 
@@ -311,6 +311,6 @@ if (effect.cCnt() == 0 || effect.mCnt() == 0) {
 
 #### Amélioration résultante
 
-La complexité cyclomatique de `enhance` passe de **14 à 11** — une petite réduction.
+La complexité cyclomatique de `enhance` passe de **14 à 11** ce qui est une petite réduction.
 
-Le gain principal est sur la **complexité cognitive** : chaque méthode extraite a une responsabilité unique et un nom qui décrit son intention. Un développeur qui lit `enhance` n'a plus besoin de parser mentalement les 35 lignes du bloc "no class affected" pour comprendre ce qui se passe,le nom `handleNoClassAffected` suffisant. S'il veut comprendre le détail, il navigue vers la méthode concernée de façon isolée. La méthode `buildNoMatchMessage` va encore plus loin en séparant la construction du message de la logique de flux, rendant chacune des deux indépendamment lisible et modifiable.
+Le gain principal est sur la **complexité cognitive**. En effet, chaque méthode extraite a une responsabilité unique et un nom qui décrit son intention. Un développeur qui lit `enhance` n'a plus besoin de parser mentalement les 35 lignes du bloc "no class affected" pour comprendre ce qui se passe,le nom `handleNoClassAffected` suffisant. S'il veut comprendre le détail, il navigue vers la méthode concernée de façon isolée. La méthode `buildNoMatchMessage` va encore plus loin en séparant la construction du message de la logique de flux, rendant chacune des deux indépendamment lisible et modifiable.
