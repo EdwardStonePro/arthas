@@ -44,15 +44,15 @@ import com.alibaba.bytekit.utils.AsmOpUtils;
 import com.alibaba.bytekit.utils.AsmUtils;
 import com.taobao.arthas.common.Pair;
 import com.taobao.arthas.core.GlobalOptions;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyInterceptor1;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyInterceptor2;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyInterceptor3;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyTraceExcludeJDKInterceptor1;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyTraceExcludeJDKInterceptor2;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyTraceExcludeJDKInterceptor3;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyTraceInterceptor1;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyTraceInterceptor2;
-import com.taobao.arthas.core.advisor.SpyInterceptors.SpyTraceInterceptor3;
+import com.taobao.arthas.core.advisor.SpyInterceptors.MethodEnterInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.MethodExitInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.MethodExceptionInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.TraceExcludeJDKBeforeInvokeInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.TraceExcludeJDKAfterInvokeInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.TraceExcludeJDKInvokeExceptionInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.TraceBeforeInvokeInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.TraceAfterInvokeInterceptor;
+import com.taobao.arthas.core.advisor.SpyInterceptors.TraceInvokeExceptionInterceptor;
 import com.taobao.arthas.core.server.ArthasBootstrap;
 import com.taobao.arthas.core.util.ArthasCheckUtils;
 import com.taobao.arthas.core.util.ClassUtils;
@@ -194,19 +194,19 @@ public class Enhancer implements ClassFileTransformer {
 
             final List<InterceptorProcessor> interceptorProcessors = new ArrayList<InterceptorProcessor>();
 
-            interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyInterceptor1.class));
-            interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyInterceptor2.class));
-            interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyInterceptor3.class));
+            interceptorProcessors.addAll(defaultInterceptorClassParser.parse(MethodEnterInterceptor.class));
+            interceptorProcessors.addAll(defaultInterceptorClassParser.parse(MethodExitInterceptor.class));
+            interceptorProcessors.addAll(defaultInterceptorClassParser.parse(MethodExceptionInterceptor.class));
 
             if (this.isTracing) {
                 if (!this.skipJDKTrace) {
-                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyTraceInterceptor1.class));
-                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyTraceInterceptor2.class));
-                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyTraceInterceptor3.class));
+                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(TraceBeforeInvokeInterceptor.class));
+                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(TraceAfterInvokeInterceptor.class));
+                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(TraceInvokeExceptionInterceptor.class));
                 } else {
-                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyTraceExcludeJDKInterceptor1.class));
-                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyTraceExcludeJDKInterceptor2.class));
-                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(SpyTraceExcludeJDKInterceptor3.class));
+                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(TraceExcludeJDKBeforeInvokeInterceptor.class));
+                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(TraceExcludeJDKAfterInvokeInterceptor.class));
+                    interceptorProcessors.addAll(defaultInterceptorClassParser.parse(TraceExcludeJDKInvokeExceptionInterceptor.class));
                 }
             }
 
